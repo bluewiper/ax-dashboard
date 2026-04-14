@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AX 업무 효율 대시보드</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Apple SD Gothic Neo', 'Pretendard', sans-serif;
+      background: #f4f5f7;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #5B5BD6;
+      color: white;
+      padding: 24px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { font-size: 20px; font-weight: 700; }
+    header p { font-size: 13px; opacity: 0.75; margin-top: 4px; }
+    .header-right { font-size: 13px; opacity: 0.8; text-align: right; }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 22px 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .card-label {
+      font-size: 11px;
+      color: #999;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    .card-value {
+      font-size: 34px;
+      font-weight: 700;
+      margin: 8px 0 4px;
+      color: #5B5BD6;
+      line-height: 1;
+    }
+    .card-value span { font-size: 15px; font-weight: 500; }
+    .card-sub { font-size: 12px; color: #bbb; }
+
+    .section {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      margin-bottom: 24px;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: #1a1a2e;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+    .chart-container { position: relative; height: 220px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      text-align: left;
+      padding: 9px 12px;
+      border-bottom: 2px solid #f0f0f0;
+      font-size: 11px;
+      font-weight: 700;
+      color: #aaa;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    th.r { text-align: right; }
+    td { padding: 12px 12px; border-bottom: 1px solid #f7f7f7; color: #333; }
+    td.r { text-align: right; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafbff; }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .g { background: #e6f9f0; color: #0d7a4e; }
+    .b { background: #ebe8ff; color: #5B5BD6; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 160px 1fr 1fr auto;
+      gap: 12px;
+      align-items: end;
+    }
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #666;
+      margin-bottom: 6px;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1.5px solid #e8e8e8;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #333;
+      background: white;
+      outline: none;
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+    .form-group input:focus,
+    .form-group select:focus { border-color: #5B5BD6; }
+
+    .btn {
+      padding: 9px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      font-family: inherit;
+    }
+    .btn:hover { opacity: 0.8; }
+    .btn-primary { background: #5B5BD6; color: white; }
+    .btn-sm { padding: 4px 10px; font-size: 11px; }
+    .btn-ghost { background: #f4f4f4; color: #666; }
+    .btn-danger-ghost { background: #fff2f2; color: #d93636; }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .log-actions { display: flex; gap: 8px; }
+
+    .empty {
+      text-align: center;
+      padding: 48px 24px;
+      color: #ccc;
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    .highlight { color: #0d7a4e; font-weight: 700; }
+    .muted { color: #ccc; }
+
+    @media (max-width: 900px) {
+      .cards { grid-template-columns: repeat(2, 1fr); }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .form-row { grid-template-columns: 1fr 1fr; }
+      header { flex-direction: column; gap: 8px; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AX 업무 효율 대시보드</h1>
+    <p id="headerSub"></p>
+  </div>
+  <div class="header-right" id="headerRight"></div>
+</header>
+
+<main>
+  <!-- Cards -->
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">이번 달 절약 시간</div>
+      <div class="card-value" id="c-saved">–</div>
+      <div class="card-sub" id="c-saved-sub"></div>
+    </div>
+    <div class="card">
+      <div class="card-label">이번 달 사용 횟수</div>
+      <div class="card-value" id="c-count">–</div>
+      <div class="card-sub" id="c-count-sub"></div>
+    </div>
+    <div class="card">
+      <div class="card-label">누적 절약 시간</div>
+      <div class="card-value" id="c-total">–</div>
+      <div class="card-sub" id="c-total-sub"></div>
+    </div>
+    <div class="card">
+      <div class="card-label">등록 스킬</div>
+      <div class="card-value" id="c-skills">–</div>
+      <div class="card-sub">활성 스킬 기준</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid-2">
+    <div class="section">
+      <div class="section-title">월별 절약 시간 추이 (분)</div>
+      <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
+    </div>
+    <div class="section">
+      <div class="section-title">이번 달 스킬별 사용 비중</div>
+      <div class="chart-container"><canvas id="skillChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ROI Table -->
+  <div class="section">
+    <div class="section-title">스킬별 ROI 기준표</div>
+    <table>
+      <thead>
+        <tr>
+          <th>스킬명</th>
+          <th class="r">개선 전</th>
+          <th class="r">개선 후</th>
+          <th class="r">절약/회</th>
+          <th class="r">이번 달 사용</th>
+          <th class="r">이번 달 절약</th>
+        </tr>
+      </thead>
+      <tbody id="roiBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Input -->
+  <div class="section">
+    <div class="section-title">사용 로그 입력</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>날짜</label>
+        <input type="date" id="logDate">
+      </div>
+      <div class="form-group">
+        <label>스킬</label>
+        <select id="logSkill"><option value="">선택하세요</option></select>
+      </div>
+      <div class="form-group">
+        <label>메모 (선택)</label>
+        <input type="text" id="logMemo" placeholder="예) 4기 AE 챕터1">
+      </div>
+      <div class="form-group">
+        <button class="btn btn-primary" onclick="addLog()">기록 추가</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log List -->
+  <div class="section">
+    <div class="log-header">
+      <div class="section-title" style="margin-bottom:0">사용 로그</div>
+      <div class="log-actions">
+        <button class="btn btn-sm btn-ghost" onclick="exportCSV()">CSV 내보내기</button>
+        <button class="btn btn-sm btn-danger-ghost" onclick="clearAll()">전체 삭제</button>
+      </div>
+    </div>
+    <div id="logContainer"></div>
+  </div>
+</main>
+
+<script>
+// ── 기준 데이터 ──────────────────────────────────────────
+const SKILLS = [
+  { name: '커리큘럼 정합성 검증', before: 90,  after: 15 },
+  { name: 'report24 만족도 리포트',  before: 120, after: 20 },
+  { name: '교안 검수 자동화',         before: 60,  after: 10 },
+  { name: 'youtube-insight',          before: 45,  after: 10 },
+  { name: 'research-eval',            before: 120, after: 30 },
+  { name: 'blitz (수주 노하우)',      before: 30,  after: 10 },
+  { name: 'conversation 슬랙 메시지', before: 20,  after: 5  },
+];
+
+// ── 스토리지 ─────────────────────────────────────────────
+const getLogs = () => JSON.parse(localStorage.getItem('ax_logs') || '[]');
+const saveLogs = d => localStorage.setItem('ax_logs', JSON.stringify(d));
+
+// ── 유틸 ─────────────────────────────────────────────────
+const saving = name => { const s = SKILLS.find(x => x.name === name); return s ? s.before - s.after : 0; };
+const ym = d => d.slice(0, 7);
+const nowYM = () => new Date().toISOString().slice(0, 7);
+const fmt = m => m >= 60 ? `${Math.floor(m/60)}시간${m%60>0?' '+m%60+'분':''}` : `${m}분`;
+
+// ── 초기화 ────────────────────────────────────────────────
+function init() {
+  const now = new Date();
+  document.getElementById('headerSub').textContent =
+    `${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 기준`;
+  document.getElementById('headerRight').textContent =
+    `커리큘럼기획 매니저 · AI 스킬 ROI 트래커`;
+  document.getElementById('logDate').value = now.toISOString().slice(0,10);
+
+  const sel = document.getElementById('logSkill');
+  SKILLS.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.name; o.textContent = s.name;
+    sel.appendChild(o);
+  });
+  render();
+}
+
+// ── 렌더 ─────────────────────────────────────────────────
+let chartM = null, chartS = null;
+
+function render() {
+  const logs = getLogs();
+  const thisM = nowYM();
+  const mLogs = logs.filter(l => ym(l.date) === thisM);
+
+  const mSaved  = mLogs.reduce((s,l) => s + saving(l.skill), 0);
+  const allSaved = logs.reduce((s,l) => s + saving(l.skill), 0);
+  const skillSet = new Set(mLogs.map(l => l.skill)).size;
+
+  // Cards
+  document.getElementById('c-saved').innerHTML  = `${mSaved}<span>분</span>`;
+  document.getElementById('c-saved-sub').textContent = mSaved >= 60 ? `약 ${fmt(mSaved)}` : mSaved > 0 ? '' : '로그를 입력하세요';
+  document.getElementById('c-count').innerHTML  = `${mLogs.length}<span>회</span>`;
+  document.getElementById('c-count-sub').textContent = `${skillSet}개 스킬 사용`;
+  document.getElementById('c-total').innerHTML  = `${allSaved}<span>분</span>`;
+  document.getElementById('c-total-sub').textContent = allSaved >= 60 ? `누적 약 ${fmt(allSaved)}` : '';
+  document.getElementById('c-skills').innerHTML = `${SKILLS.length}<span>개</span>`;
+
+  renderROI(mLogs);
+  renderMonthly(logs);
+  renderSkill(mLogs);
+  renderLogs(logs);
+}
+
+function renderROI(mLogs) {
+  const cnt = {};
+  mLogs.forEach(l => cnt[l.skill] = (cnt[l.skill]||0)+1);
+  document.getElementById('roiBody').innerHTML = SKILLS.map(s => {
+    const sv = s.before - s.after;
+    const c  = cnt[s.name] || 0;
+    const ms = sv * c;
+    return `<tr>
+      <td>${s.name}</td>
+      <td class="r muted">${s.before}분</td>
+      <td class="r muted">${s.after}분</td>
+      <td class="r"><span class="badge g">-${sv}분</span></td>
+      <td class="r">${c > 0 ? `<span class="badge b">${c}회</span>` : '<span class="muted">-</span>'}</td>
+      <td class="r ${ms>0?'highlight':'muted'}">${ms > 0 ? fmt(ms) : '-'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderMonthly(logs) {
+  const months = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  const data   = months.map(m => logs.filter(l => ym(l.date)===m).reduce((s,l)=>s+saving(l.skill),0));
+  const labels = months.map(m => `${m.slice(5)}월`);
+
+  const ctx = document.getElementById('monthlyChart').getContext('2d');
+  if (chartM) chartM.destroy();
+  chartM = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: months.map(m => m===nowYM() ? '#5B5BD6' : '#d6d3f7'),
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => ` ${ctx.parsed.y}분 절약` }
+      }},
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#f2f2f2' }, ticks: { font: { size: 11 } } },
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+function renderSkill(mLogs) {
+  const cnt = {};
+  mLogs.forEach(l => cnt[l.skill] = (cnt[l.skill]||0)+1);
+  const entries = Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+
+  const ctx = document.getElementById('skillChart').getContext('2d');
+  if (chartS) chartS.destroy();
+
+  if (!entries.length) {
+    chartS = new Chart(ctx, {
+      type: 'doughnut',
+      data: { labels:['데이터 없음'], datasets:[{data:[1], backgroundColor:['#f0f0f0'], borderWidth:0}] },
+      options: { responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ labels:{ color:'#ccc', font:{size:11} } } } }
+    });
+    return;
+  }
+
+  const palette = ['#5B5BD6','#8b87e8','#b8b5f4','#d6d3f7','#7c6ef7','#a09af9'];
+  chartS = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: entries.map(([n]) => n.length > 12 ? n.slice(0,12)+'…' : n),
+      datasets: [{ data: entries.map(([,v])=>v), backgroundColor: palette, borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position:'bottom', labels:{ font:{size:11}, padding:10 } } }
+    }
+  });
+}
+
+function renderLogs(logs) {
+  const el = document.getElementById('logContainer');
+  if (!logs.length) {
+    el.innerHTML = '<div class="empty">아직 로그가 없습니다.<br>위 폼에서 첫 번째 사용 기록을 추가해 보세요.</div>';
+    return;
+  }
+  const sorted = [...logs].sort((a,b) => b.date.localeCompare(a.date));
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>날짜</th><th>스킬</th><th class="r">절약 시간</th><th>메모</th><th></th>
+    </tr></thead>
+    <tbody>
+    ${sorted.map(l => {
+      const idx = logs.indexOf(l);
+      const sv = saving(l.skill);
+      return `<tr>
+        <td class="muted" style="font-size:12px">${l.date}</td>
+        <td><span class="badge b">${l.skill}</span></td>
+        <td class="r highlight">-${sv}분</td>
+        <td style="font-size:12px; color:#999">${l.memo||'–'}</td>
+        <td style="text-align:right">
+          <button class="btn btn-sm btn-danger-ghost" onclick="del(${idx})">삭제</button>
+        </td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table>`;
+}
+
+// ── 액션 ─────────────────────────────────────────────────
+function addLog() {
+  const date  = document.getElementById('logDate').value;
+  const skill = document.getElementById('logSkill').value;
+  const memo  = document.getElementById('logMemo').value.trim();
+  if (!date || !skill) { alert('날짜와 스킬을 선택해 주세요.'); return; }
+  const logs = getLogs();
+  logs.push({ date, skill, memo, at: new Date().toISOString() });
+  saveLogs(logs);
+  document.getElementById('logMemo').value = '';
+  render();
+}
+
+function del(i) {
+  if (!confirm('이 로그를 삭제할까요?')) return;
+  const logs = getLogs();
+  logs.splice(i, 1);
+  saveLogs(logs);
+  render();
+}
+
+function clearAll() {
+  if (!confirm('전체 로그를 삭제합니다. 되돌릴 수 없습니다.')) return;
+  saveLogs([]);
+  render();
+}
+
+function exportCSV() {
+  const logs = getLogs();
+  if (!logs.length) { alert('내보낼 로그가 없습니다.'); return; }
+  const rows = [['날짜','스킬명','절약시간(분)','메모'], ...logs.map(l=>[l.date, l.skill, saving(l.skill), l.memo||''])];
+  const csv = rows.map(r => r.map(v=>`"${v}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'}));
+  a.download = `ax_log_${nowYM()}.csv`;
+  a.click();
+}
+
+init();
+</script>
+</body>
+</html>
