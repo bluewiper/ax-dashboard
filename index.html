@@ -228,7 +228,7 @@
       <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
     </div>
     <div class="section">
-      <div class="section-title">이번 달 스킬별 사용 비중</div>
+      <div class="section-title">이번 달 스킬별 사용 비중 <span id="skillChartLabel" style="font-size:11px; font-weight:400; color:#aaa; margin-left:4px;"></span></div>
       <div class="chart-container"><canvas id="skillChart"></canvas></div>
     </div>
   </div>
@@ -289,18 +289,40 @@
 <script>
 // ── 기준 데이터 ──────────────────────────────────────────
 const SKILLS = [
-  { name: '커리큘럼 정합성 검증', before: 90,  after: 15 },
-  { name: 'report24 만족도 리포트',  before: 120, after: 20 },
-  { name: '교안 검수 자동화',         before: 60,  after: 10 },
-  { name: 'youtube-insight',          before: 45,  after: 10 },
-  { name: 'research-eval',            before: 120, after: 30 },
-  { name: 'blitz (수주 노하우)',      before: 30,  after: 10 },
-  { name: 'conversation 슬랙 메시지', before: 20,  after: 5  },
+  { name: '커리큘럼 정합성 검증',    before: 90,  after: 15, target: 3 },
+  { name: 'report24 만족도 리포트',  before: 120, after: 20, target: 8 },
+  { name: '교안 검수 자동화',        before: 60,  after: 10, target: 3 },
+  { name: 'youtube-insight',         before: 45,  after: 10, target: 2 },
+  { name: 'research-eval',           before: 120, after: 30, target: 3 },
+  { name: 'blitz (수주 노하우)',     before: 30,  after: 10, target: 2 },
+  { name: 'conversation 슬랙 메시지',before: 20,  after: 5,  target: 5 },
 ];
 
-// ── 스토리지 ─────────────────────────────────────────────
-const getLogs = () => JSON.parse(localStorage.getItem('ax_logs') || '[]');
-const saveLogs = d => localStorage.setItem('ax_logs', JSON.stringify(d));
+// ── API ──────────────────────────────────────────────────
+const API = '/api/log';
+let _logs = [];  // 메모리 캐시
+
+async function fetchLogs() {
+  try {
+    const res = await fetch(API);
+    _logs = await res.json();
+  } catch(e) {
+    console.error('로그 불러오기 실패', e);
+    _logs = [];
+  }
+}
+
+async function postLog(entry) {
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  });
+  if (!res.ok) throw new Error('저장 실패');
+  const data = await res.json();
+  _logs = await (await fetch(API)).json();  // 최신 목록 갱신
+  return data;
+}
 
 // ── 유틸 ─────────────────────────────────────────────────
 const saving = name => { const s = SKILLS.find(x => x.name === name); return s ? s.before - s.after : 0; };
@@ -309,7 +331,7 @@ const nowYM = () => new Date().toISOString().slice(0, 7);
 const fmt = m => m >= 60 ? `${Math.floor(m/60)}시간${m%60>0?' '+m%60+'분':''}` : `${m}분`;
 
 // ── 초기화 ────────────────────────────────────────────────
-function init() {
+async function init() {
   const now = new Date();
   document.getElementById('headerSub').textContent =
     `${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 기준`;
@@ -323,6 +345,11 @@ function init() {
     o.value = s.name; o.textContent = s.name;
     sel.appendChild(o);
   });
+
+  document.getElementById('logContainer').innerHTML =
+    '<div class="empty">로그를 불러오는 중...</div>';
+
+  await fetchLogs();
   render();
 }
 
@@ -330,7 +357,7 @@ function init() {
 let chartM = null, chartS = null;
 
 function render() {
-  const logs = getLogs();
+  const logs = _logs;
   const thisM = nowYM();
   const mLogs = logs.filter(l => ym(l.date) === thisM);
 
@@ -412,25 +439,44 @@ function renderSkill(mLogs) {
   mLogs.forEach(l => cnt[l.skill] = (cnt[l.skill]||0)+1);
   const entries = Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
 
+  const label = document.getElementById('skillChartLabel');
   const ctx = document.getElementById('skillChart').getContext('2d');
   if (chartS) chartS.destroy();
 
   if (!entries.length) {
+    label.textContent = '';
+    // 빈 캔버스에 텍스트로 안내
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    const emptyPlugin = {
+      id: 'emptyState',
+      afterDraw(chart) {
+        const { ctx: c, chartArea: { left, right, top, bottom } } = chart;
+        const cx = (left + right) / 2, cy = (top + bottom) / 2;
+        c.save();
+        c.textAlign = 'center';
+        c.fillStyle = '#ccc';
+        c.font = '13px -apple-system, sans-serif';
+        c.fillText('로그를 입력하면', cx, cy - 10);
+        c.fillText('자동으로 표시됩니다', cx, cy + 12);
+        c.restore();
+      }
+    };
     chartS = new Chart(ctx, {
       type: 'doughnut',
-      data: { labels:['데이터 없음'], datasets:[{data:[1], backgroundColor:['#f0f0f0'], borderWidth:0}] },
-      options: { responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{ labels:{ color:'#ccc', font:{size:11} } } } }
+      data: { datasets: [{ data: [], backgroundColor: [] }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } },
+      plugins: [emptyPlugin]
     });
     return;
   }
 
-  const palette = ['#5B5BD6','#8b87e8','#b8b5f4','#d6d3f7','#7c6ef7','#a09af9'];
+  label.textContent = `실적 기준`;
+  const palette = ['#5B5BD6','#8b87e8','#b8b5f4','#d6d3f7','#7c6ef7','#a09af9','#c4c1fa'];
   chartS = new Chart(ctx, {
     type: 'doughnut',
     data: {
       labels: entries.map(([n]) => n.length > 12 ? n.slice(0,12)+'…' : n),
-      datasets: [{ data: entries.map(([,v])=>v), backgroundColor: palette, borderWidth: 0 }]
+      datasets: [{ data: entries.map(([,v])=>v), backgroundColor: palette.slice(0, entries.length), borderWidth: 0 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
@@ -469,36 +515,37 @@ function renderLogs(logs) {
 }
 
 // ── 액션 ─────────────────────────────────────────────────
-function addLog() {
+async function addLog() {
   const date  = document.getElementById('logDate').value;
   const skill = document.getElementById('logSkill').value;
   const memo  = document.getElementById('logMemo').value.trim();
   if (!date || !skill) { alert('날짜와 스킬을 선택해 주세요.'); return; }
-  const logs = getLogs();
-  logs.push({ date, skill, memo, at: new Date().toISOString() });
-  saveLogs(logs);
-  document.getElementById('logMemo').value = '';
-  render();
+
+  const btn = event.target;
+  btn.textContent = '저장 중...'; btn.disabled = true;
+  try {
+    await postLog({ date, skill, memo, source: 'manual' });
+    document.getElementById('logMemo').value = '';
+    render();
+  } catch(e) {
+    alert('저장에 실패했습니다. GITHUB_TOKEN 설정을 확인해 주세요.');
+  } finally {
+    btn.textContent = '기록 추가'; btn.disabled = false;
+  }
 }
 
-function del(i) {
-  if (!confirm('이 로그를 삭제할까요?')) return;
-  const logs = getLogs();
-  logs.splice(i, 1);
-  saveLogs(logs);
-  render();
+function del() {
+  alert('로그 삭제는 data/logs.json 파일을 직접 수정해 주세요.');
 }
 
 function clearAll() {
-  if (!confirm('전체 로그를 삭제합니다. 되돌릴 수 없습니다.')) return;
-  saveLogs([]);
-  render();
+  alert('전체 삭제는 data/logs.json 파일을 직접 수정해 주세요.');
 }
 
 function exportCSV() {
-  const logs = getLogs();
-  if (!logs.length) { alert('내보낼 로그가 없습니다.'); return; }
-  const rows = [['날짜','스킬명','절약시간(분)','메모'], ...logs.map(l=>[l.date, l.skill, saving(l.skill), l.memo||''])];
+  if (!_logs.length) { alert('내보낼 로그가 없습니다.'); return; }
+  const rows = [['날짜','스킬명','절약시간(분)','메모','출처'],
+    ..._logs.map(l=>[l.date, l.skill, saving(l.skill), l.memo||'', l.source||''])];
   const csv = rows.map(r => r.map(v=>`"${v}"`).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'}));
