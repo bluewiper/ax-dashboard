@@ -288,15 +288,16 @@
 
 <script>
 // ── 기준 데이터 ──────────────────────────────────────────
+// id: 훅이 기록하는 실제 스킬 호출명, name: 화면 표시용
 const SKILLS = [
-  { name: '커리큘럼 정합성 검증',    before: 90,  after: 15, target: 3 },
-  { name: 'report24 만족도 리포트',  before: 120, after: 20, target: 8 },
-  { name: '교안 검수 자동화',        before: 60,  after: 10, target: 3 },
-  { name: 'youtube-insight',         before: 45,  after: 10, target: 2 },
-  { name: 'research-eval',           before: 120, after: 30, target: 3 },
-  { name: 'blitz (수주 노하우)',     before: 30,  after: 10, target: 2 },
-  { name: 'conversation 슬랙 메시지',before: 20,  after: 5,  target: 5 },
-  { name: 'pr (외부 PR 메시지)',      before: 30,  after: 5,  target: 2 },
+  { id: 'hrdnet-cycle',          name: 'HRD-Net 사이클',       before: 120, after: 15, target: 4 },
+  { id: 'report24',              name: 'report24 만족도 리포트', before: 120, after: 20, target: 8 },
+  { id: 'curriculum-inspection', name: '교안 검수',             before: 60,  after: 10, target: 3 },
+  { id: 'youtube-insight',       name: 'youtube-insight',       before: 45,  after: 10, target: 2 },
+  { id: 'research-eval',         name: 'research-eval',         before: 120, after: 30, target: 3 },
+  { id: 'blitz',                 name: 'blitz 수주 노하우',     before: 30,  after: 10, target: 2 },
+  { id: 'conversation',          name: 'conversation 슬랙',     before: 20,  after: 5,  target: 5 },
+  { id: 'pr',                    name: 'pr 외부 메시지',        before: 30,  after: 5,  target: 2 },
 ];
 
 // ── API ──────────────────────────────────────────────────
@@ -326,7 +327,8 @@ async function postLog(entry) {
 }
 
 // ── 유틸 ─────────────────────────────────────────────────
-const saving = name => { const s = SKILLS.find(x => x.name === name); return s ? s.before - s.after : 0; };
+const findSkill = id => SKILLS.find(x => x.id === id || x.name === id);
+const saving = id => { const s = findSkill(id); return s ? s.before - s.after : 0; };
 const ym = d => d.slice(0, 7);
 const nowYM = () => new Date().toISOString().slice(0, 7);
 const fmt = m => m >= 60 ? `${Math.floor(m/60)}시간${m%60>0?' '+m%60+'분':''}` : `${m}분`;
@@ -384,19 +386,35 @@ function render() {
 function renderROI(mLogs) {
   const cnt = {};
   mLogs.forEach(l => cnt[l.skill] = (cnt[l.skill]||0)+1);
-  document.getElementById('roiBody').innerHTML = SKILLS.map(s => {
-    const sv = s.before - s.after;
-    const c  = cnt[s.name] || 0;
-    const ms = sv * c;
-    return `<tr>
-      <td>${s.name}</td>
-      <td class="r muted">${s.before}분</td>
-      <td class="r muted">${s.after}분</td>
-      <td class="r"><span class="badge g">-${sv}분</span></td>
-      <td class="r">${c > 0 ? `<span class="badge b">${c}회</span>` : '<span class="muted">-</span>'}</td>
-      <td class="r ${ms>0?'highlight':'muted'}">${ms > 0 ? fmt(ms) : '-'}</td>
-    </tr>`;
-  }).join('');
+
+  // 등록된 스킬 + 등록되지 않았지만 로그에 있는 스킬
+  const unknownIds = [...new Set(mLogs.map(l=>l.skill))].filter(id => !findSkill(id));
+  const rows = [
+    ...SKILLS.map(s => {
+      const sv = s.before - s.after;
+      const c  = cnt[s.id] || 0;
+      const ms = sv * c;
+      return `<tr>
+        <td>${s.name} <span style="font-size:10px;color:#bbb">${s.id}</span></td>
+        <td class="r muted">${s.before}분</td>
+        <td class="r muted">${s.after}분</td>
+        <td class="r"><span class="badge g">-${sv}분</span></td>
+        <td class="r">${c > 0 ? `<span class="badge b">${c}회</span>` : '<span class="muted">-</span>'}</td>
+        <td class="r ${ms>0?'highlight':'muted'}">${ms > 0 ? fmt(ms) : '-'}</td>
+      </tr>`;
+    }),
+    ...unknownIds.map(id => {
+      const c = cnt[id] || 0;
+      return `<tr style="opacity:0.5">
+        <td>${id} <span style="font-size:10px;color:#e0a">미등록</span></td>
+        <td class="r muted">-</td><td class="r muted">-</td>
+        <td class="r muted">-</td>
+        <td class="r"><span class="badge b">${c}회</span></td>
+        <td class="r muted">-</td>
+      </tr>`;
+    }),
+  ];
+  document.getElementById('roiBody').innerHTML = rows.join('');
 }
 
 function renderMonthly(logs) {
@@ -473,10 +491,11 @@ function renderSkill(mLogs) {
 
   label.textContent = `실적 기준`;
   const palette = ['#5B5BD6','#8b87e8','#b8b5f4','#d6d3f7','#7c6ef7','#a09af9','#c4c1fa'];
+  const displayLabel = id => { const s = findSkill(id); return s ? s.name : id; };
   chartS = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: entries.map(([n]) => n.length > 12 ? n.slice(0,12)+'…' : n),
+      labels: entries.map(([id]) => { const l = displayLabel(id); return l.length > 12 ? l.slice(0,12)+'…' : l; }),
       datasets: [{ data: entries.map(([,v])=>v), backgroundColor: palette.slice(0, entries.length), borderWidth: 0 }]
     },
     options: {
@@ -503,7 +522,7 @@ function renderLogs(logs) {
       const sv = saving(l.skill);
       return `<tr>
         <td class="muted" style="font-size:12px">${l.date}</td>
-        <td><span class="badge b">${l.skill}</span></td>
+        <td><span class="badge b">${(findSkill(l.skill)||{name:l.skill}).name}</span></td>
         <td class="r highlight">-${sv}분</td>
         <td style="font-size:12px; color:#999">${l.memo||'–'}</td>
         <td style="text-align:right">
