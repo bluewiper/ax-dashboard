@@ -418,5 +418,12 @@
     "memo": "",
     "source": "claude-code",
     "at": "2026-06-12T08:42:13.244Z"
+  },
+  {
+    "date": "2026-06-15",
+    "skill": "ts-common:meeting-minutes",
+    "memo": "",
+    "source": "claude-code",
+    "at": "2026-06-15T09:33:42.067Z"
   }
 ]
