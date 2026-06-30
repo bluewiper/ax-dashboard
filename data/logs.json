@@ -551,5 +551,12 @@
     "memo": "",
     "source": "claude-code",
     "at": "2026-06-26T08:20:05.819Z"
+  },
+  {
+    "date": "2026-06-30",
+    "skill": "plannotator-annotate",
+    "memo": "",
+    "source": "claude-code",
+    "at": "2026-06-30T10:03:08.103Z"
   }
 ]
