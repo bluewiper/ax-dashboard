@@ -985,5 +985,12 @@
     "memo": "",
     "source": "claude-code",
     "at": "2026-08-21T07:58:28.252Z"
+  },
+  {
+    "date": "2026-08-21",
+    "skill": "exit-safe",
+    "memo": "",
+    "source": "claude-code",
+    "at": "2026-08-21T08:01:58.321Z"
   }
 ]
