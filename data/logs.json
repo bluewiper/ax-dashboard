@@ -1174,5 +1174,12 @@
     "memo": "",
     "source": "claude-code",
     "at": "2026-09-01T01:20:02.364Z"
+  },
+  {
+    "date": "2026-09-01",
+    "skill": "korean-character-count",
+    "memo": "",
+    "source": "claude-code",
+    "at": "2026-09-01T04:15:53.667Z"
   }
 ]
